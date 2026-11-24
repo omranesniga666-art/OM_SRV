@@ -17,6 +17,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import android.content.Intent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -25,6 +26,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.background
@@ -236,7 +239,13 @@ fun OMSrvScreen(
 ) {
     var order by remember { mutableStateOf("N-E-Z") }
     var showPlotter by remember { mutableStateOf(false) }
+    var showCadWorkspace by remember { mutableStateOf(false) }
+    if (showCadWorkspace && drawingBitmap != null) {
+        CadWorkspaceScreen(bitmap = drawingBitmap, drawingName = drawingName, onBack = { showCadWorkspace = false })
+        return
+    }
     Scaffold(
+        containerColor = Color(0xFFF7F4F2),
         topBar = {
             TopAppBar(
                 title = {
@@ -248,13 +257,17 @@ fun OMSrvScreen(
             )
         }
     ) { padding ->
-        Column(Modifier.padding(padding).padding(16.dp).fillMaxSize()) {
+        Box(Modifier.fillMaxSize().padding(padding)) {
+            Image(painter = painterResource(id = R.drawable.om_srv_brand), contentDescription = null,
+                modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alpha = 0.08f)
+            Column(Modifier.padding(16.dp).fillMaxSize().verticalScroll(rememberScrollState())) {
             Image(
                 painter = painterResource(id = R.drawable.om_srv_brand),
                 contentDescription = "OM_SRV Surveying",
                 modifier = Modifier.fillMaxWidth().height(210.dp),
                 contentScale = ContentScale.Crop
             )
+            DeveloperContactCard()
             Spacer(Modifier.height(10.dp))
             Text("OM_SRV • إدارة بيانات المساحة | Survey Data",
                 style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -297,10 +310,16 @@ fun OMSrvScreen(
             Text(message, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { showPlotter = !showPlotter }) {
-                    Text(if (showPlotter) "إخفاء اللوحة / Hide" else "إسقاط على لوحة / Plot")
+                Button(onClick = onLoadDrawing, modifier = Modifier.weight(1f)) { Text("تحميل لوحة CAD / PDF") }
+                OutlinedButton(onClick = { showPlotter = !showPlotter }, modifier = Modifier.weight(1f), enabled = drawingBitmap != null) {
+                    Text(if (showPlotter) "إخفاء الإسقاط" else "إسقاط النقاط")
                 }
-                OutlinedButton(onClick = onLoadDrawing) { Text("تحميل لوحة / Load") }
+            }
+            if (drawingBitmap != null) {
+                Button(onClick = { showCadWorkspace = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("فتح مساحة CAD للفحص والتكبير")
+                }
+                Text("اللوحة: $drawingName", style = MaterialTheme.typography.labelSmall)
             }
             if (showPlotter) {
                 DrawingPlotter(points = points, bitmap = drawingBitmap, drawingName = drawingName)
@@ -316,17 +335,15 @@ fun OMSrvScreen(
                             .forEach { HeaderCell(it) }
                     }
                     HorizontalDivider()
-                    LazyColumn {
-                        items(points) { p ->
-                            Row {
-                                DataCell(p.point)
-                                DataCell(fmt(if (order == "N-E-Z") p.northing else p.easting))
-                                DataCell(fmt(if (order == "N-E-Z") p.easting else p.northing))
-                                DataCell(fmt(p.elevation))
-                                DataCell(p.code)
-                            }
-                            HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+                    points.forEach { p ->
+                        Row {
+                            DataCell(p.point)
+                            DataCell(fmt(if (order == "N-E-Z") p.northing else p.easting))
+                            DataCell(fmt(if (order == "N-E-Z") p.easting else p.northing))
+                            DataCell(fmt(p.elevation))
+                            DataCell(p.code)
                         }
+                        HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                     }
                 }
             }
@@ -338,6 +355,39 @@ fun OMSrvScreen(
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            }
+        }
+    }
+}
+
+@Composable
+fun CadWorkspaceScreen(bitmap: Bitmap, drawingName: String, onBack: () -> Unit) {
+    var zoom by remember(bitmap) { mutableFloatStateOf(1f) }
+    var panX by remember(bitmap) { mutableFloatStateOf(0f) }
+    var panY by remember(bitmap) { mutableFloatStateOf(0f) }
+    androidx.activity.compose.BackHandler { onBack() }
+    Scaffold(containerColor = Color.Black, topBar = {
+        TopAppBar(title = { Column { Text("عارض اللوحات CAD", color = Color.White); Text(drawingName, color = Color.LightGray, style = MaterialTheme.typography.labelSmall) } },
+            navigationIcon = { IconButton(onClick = onBack) { Text("‹", color = Color.White, style = MaterialTheme.typography.headlineMedium) } },
+            actions = { TextButton(onClick = { zoom = 1f; panX = 0f; panY = 0f }) { Text("إعادة العرض", color = Color.Cyan) } },
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF111923)))
+    }) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            Box(Modifier.weight(1f).fillMaxWidth().background(Color.Black).pointerInput(bitmap) {
+                detectTransformGestures { _, pan, factor, _ ->
+                    zoom = (zoom * factor).coerceIn(1f, 8f); panX += pan.x; panY += pan.y
+                }
+            }) {
+                Image(bitmap = bitmap.asImageBitmap(), contentDescription = "CAD drawing", contentScale = ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize().graphicsLayer { scaleX = zoom; scaleY = zoom; translationX = panX; translationY = panY })
+                Text("تكبير بإصبعين وتحريك بإصبعين", modifier = Modifier.align(androidx.compose.ui.Alignment.BottomCenter)
+                    .padding(12.dp).background(Color(0x99000000)).padding(8.dp), color = Color.White)
+            }
+            Row(Modifier.fillMaxWidth().background(Color(0xFF111923)).padding(10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { zoom = (zoom / 1.25f).coerceAtLeast(1f) }, modifier = Modifier.weight(1f)) { Text("−", color = Color.White) }
+                OutlinedButton(onClick = { zoom = (zoom * 1.25f).coerceAtMost(8f) }, modifier = Modifier.weight(1f)) { Text("+", color = Color.White) }
+                Button(onClick = onBack, modifier = Modifier.weight(1f)) { Text("رجوع") }
+            }
         }
     }
 }

@@ -1,7 +1,7 @@
 # OM_SRV — Android Survey Data Manager
 
 **Package:** `com.omsrv.app`  
-**Version:** 0.1.0 prototype  
+**Version:** 0.6.0 UI/CAD preview update  
 **Languages:** Arabic/English-ready UI foundation
 
 ## Current prototype
@@ -54,20 +54,14 @@ This is a visual placement prototype only. It does not yet save a calibrated dra
 - Projected markers are visual symbols with point IDs. Check the calibration with independent known points; three-point affine placement is not a substitute for a full georeferencing QA workflow.
 
 ## Branding and developer contact (v0.5.0)
-- Added supplied surveying artwork as the in-app branded header image.
+- Added supplied surveying artwork as the in-app branded header image and a subtle full-screen background.
 - Added a launcher icon derived from the supplied artwork.
 - Developer: Engineer / Omran Sayed.
 - Title: Surveying and Geographic Information Systems (GIS) Consultant.
 - WhatsApp-only contact: 01004156997 (tap contact line to open WhatsApp).
 
 
-## Build an installable APK (v0.5.0)
-This environment does not include Android SDK, Gradle, or adb, so an APK cannot be compiled or device-tested here.
-A GitHub Actions workflow is included at `.github/workflows/android-apk.yml`:
-1. Upload this project folder to a GitHub repository.
-2. Open the repository's **Actions** tab.
-3. Run **Build OM_SRV APK** (or push to `main`).
-4. Download the `OM_SRV-debug-apk` artifact from the completed workflow run.
-5. Transfer `app-debug.apk` to Android and install it. Android may ask permission to install apps from that file manager.
-
-The produced artifact is a debug APK for testing, not a Play Store release. The app still requires feature validation and device testing before production use.
+## v0.6.0 interface update
+- Developer contact card is now placed near the top of the home screen so it is easier to find.
+- Added a dark CAD preview workspace for loaded raster/PDF/DXF previews with pinch zoom, pan, zoom buttons, and reset.
+- This workspace is a drawing viewer, not a full CAD editor. DWG remains unsupported natively; SDR/GSI/PNT and Excel conversion are not implemented in this build.
